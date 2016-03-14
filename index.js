@@ -37,7 +37,7 @@ module.exports = function(s) {
     tw.on('tweet', function (tweet) {
         summit.io.emit('tweet', tweet);
 
-        if( latest.length == 10 ) {
+        if( latest.length >= (config.cacheLength || 10) ) {
             latest.shift();
         }
 
