@@ -62,7 +62,7 @@ module.exports = function(s) {
 
     return summit.settings()
         .then(function(s) {
-            settings = s;
+            settings = s || {};
 
             if( !config.consumer_key ) {
                 summit.registerSetting({
