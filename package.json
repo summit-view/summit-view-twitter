@@ -1,6 +1,6 @@
 {
   "name": "summit-view-twitter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Twitter-panel for Summit View",
   "main": "index.js",
   "scripts": {
