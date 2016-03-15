@@ -1,60 +1,73 @@
 var Twitter = require('node-tweet-stream');
 var id = 'summit-view-twitter';
-var config, summit, tw, keywords = [], latest = [];
+var config, settings, summit, tw, latest = [];
 
 var track = function(topic) {
-    // untrack current keywords
-    while( i = keywords.pop() ) {
-        tw.untrack(i);
+    if( !tw ) {
+        return;
     }
+
+    // untrack current keywords
+    tw.untrackAll();
 
     // track new keywords
     var topics = topic.split(',');
     for (var i = topics.length - 1; i >= 0; i--) {
-        var keyword = topics[i].trim();
-        keywords.push(keyword);
-        tw.track(keyword);
+        tw.track(topics[i].trim());
+    }
+};
+
+var initClient = function() {
+    if( tw ) {
+        tw.untrackAll();
+    }
+
+    var cfg = {
+        consumer_key: config.consumer_key || settings.consumer_key || '',
+        consumer_secret: config.consumer_secret || settings.consumer_secret || '',
+        token: config.token || settings.token || '',
+        token_secret: config.token_secret || settings.token_secret || '',
+        cacheLength: config.cacheLength || 15,
+    };
+
+    if( cfg.consumer_key && cfg.consumer_secret && cfg.token && cfg.token_secret ) {
+        tw = new Twitter(cfg);
+
+        // emit tweets as they come in
+        tw.on('tweet', function (tweet) {
+            summit.io.emit('tweet', tweet);
+
+            if( latest.length >= cfg.cacheLength ) {
+                latest.shift();
+            }
+
+            latest.push(tweet);
+        });
+    }
+    else {
+        if( tw ) {
+            tw = false;
+        }
     }
 };
 
 module.exports = function(s) {
     summit = s;
+    config = config || {};
 
     // emit the latest tweets on new connection
     summit.io.on('connection', function() {
         summit.io.emit('tweets', latest);
     });
 
-    // init twitter-client
-    tw = new Twitter({
-        consumer_key: config.consumer_key,
-        consumer_secret: config.consumer_secret,
-        token: config.token,
-        token_secret: config.token_secret,
-    });
-
-    // emit tweets as they come in
-    tw.on('tweet', function (tweet) {
-        summit.io.emit('tweet', tweet);
-
-        if( latest.length >= (config.cacheLength || 10) ) {
-            latest.shift();
-        }
-
-        latest.push(tweet);
-    });
-
-    tw.on('error', function (err) {
-
-    });
-
     return summit.settings()
-        .then(function(settings) {
+        .then(function(s) {
+            settings = s;
 
             if( !config.consumer_key ) {
                 summit.registerSetting({
                     name: 'consumer_key',
-                    label: 'Consumer Key (n/a)',
+                    label: 'Consumer Key',
                     type: 'text',
                     value: settings.consumer_key || '',
                 });
@@ -63,7 +76,7 @@ module.exports = function(s) {
             if( !config.consumer_secret ) {
                 summit.registerSetting({
                     name: 'consumer_secret',
-                    label: 'Consumer Secret (n/a)',
+                    label: 'Consumer Secret',
                     type: 'text',
                     value: settings.consumer_secret || '',
                 });
@@ -72,7 +85,7 @@ module.exports = function(s) {
             if( !config.token ) {
                 summit.registerSetting({
                     name: 'token',
-                    label: 'Token (n/a)',
+                    label: 'Token',
                     type: 'text',
                     value: settings.token || '',
                 });
@@ -81,7 +94,7 @@ module.exports = function(s) {
             if( !config.token_secret ) {
                 summit.registerSetting({
                     name: 'token_secret',
-                    label: 'Token Secret (n/a)',
+                    label: 'Token Secret',
                     type: 'text',
                     value: settings.token_secret || '',
                 });
@@ -95,6 +108,8 @@ module.exports = function(s) {
                 icon: 'hashtag',
                 value: settings.topic || '',
             });
+
+            initClient();
 
             if( settings.topic ) {
                 track(settings.topic)
@@ -112,11 +127,13 @@ module.exports.client = __dirname + '/lib/client.js';
 
 module.exports.style = __dirname + '/public/style.css';
 
-module.exports.onSettings = function(settings) {
+module.exports.onSettings = function(s) {
+    settings = s;
+    initClient();
     track(settings.topic);
 };
 
-module.exports.init = function(cfg) {
-    config = cfg;
+module.exports.init = function(c) {
+    config = c;
     return module.exports;
 };
