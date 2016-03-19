@@ -15,6 +15,13 @@ var track = function(topic) {
     for (var i = topics.length - 1; i >= 0; i--) {
         tw.track(topics[i].trim());
     }
+
+    if( topic.trim().length == 0 ) {
+        summit.io.emit('loading', 'No topics to track...');
+    }
+    else {
+        summit.io.emit('loaded');
+    }
 };
 
 var initClient = function() {
@@ -43,10 +50,13 @@ var initClient = function() {
 
             latest.push(tweet);
         });
+
+        summit.io.emit('loaded');
     }
     else {
         if( tw ) {
             tw = false;
+            summit.io.emit('loading', 'Need API-settings...');
         }
     }
 };
@@ -56,8 +66,15 @@ module.exports = function(s) {
     config = config || {};
 
     // emit the latest tweets on new connection
-    summit.io.on('connection', function() {
-        summit.io.emit('tweets', latest);
+    summit.io.on('connection', function(socket) {
+        socket.emit('tweets', latest);
+
+        if( tw ) {
+            socket.emit('loaded');
+        }
+        else {
+            socket.emit('loading', 'Need settings...');
+        }
     });
 
     return summit.settings()
@@ -112,11 +129,21 @@ module.exports = function(s) {
             initClient();
 
             if( settings.topic ) {
-                track(settings.topic)
+                track(settings.topic);
             }
 
             return {
                 id: id,
+                branding: {
+                    icon: {
+                        fa: 'twitter',
+                    },
+                    color: {
+                        background: 'twitter',
+                        text: 'clouds',
+                        icon: 'clouds',
+                    }
+                },
             };
         });
 };
